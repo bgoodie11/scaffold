@@ -22,6 +22,11 @@ let navigationAccuracy = null;
 let navigationActive = false;
 let currentOriginMarker = null;
 let currentOriginAccuracy = null;
+function resetControlPanelScroll() {
+  if (!document.body.classList.contains('walking-mode')) controlPanel.scrollTop = 0;
+}
+window.addEventListener('pageshow', resetControlPanelScroll);
+window.requestAnimationFrame(resetControlPanelScroll);
 window.addEventListener('resize', () => map.invalidateSize());
 setTimeout(() => map.invalidateSize(), 0);
 
