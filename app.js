@@ -3,6 +3,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19,
 L.control.zoom({ position: 'topright' }).addTo(map);
 
 const routeForm = document.querySelector('#route-form');
+const controlPanel = document.querySelector('.control-panel');
 const button = document.querySelector('#route-button');
 const locationButton = document.querySelector('#location-button');
 const goButton = document.querySelector('#go-button');
@@ -50,6 +51,7 @@ function showCurrentOrigin(position) {
 function setWalkingMode(active) {
   walkingIndicator.hidden = !active;
   document.body.classList.toggle('walking-mode', active);
+  controlPanel.classList.toggle('walking-mode', active);
   map.getContainer().classList.toggle('walking-map', active);
 }
 
