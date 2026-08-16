@@ -78,7 +78,7 @@ button:disabled { opacity: .55; cursor: wait; }
 .legend-reported { width: 10px !important; height: 10px !important; border-radius: 50% !important; background: #7856b8; }
 .map-legend em { color: #7a857d; font-style: normal; }
 @media (max-width: 760px) {
-  .control-panel { top: 12px; left: 12px; width: calc(100vw - 24px); max-height: calc(100vh - 24px); padding: 20px 16px; }
+  .control-panel { top: max(12px, env(safe-area-inset-top)); left: 12px; width: calc(100vw - 24px); max-height: calc(100dvh - max(24px, env(safe-area-inset-top) + 12px)); padding: 20px 16px; }
   h1 { font-size: clamp(27px, 9vw, 34px); }
   .intro { margin-bottom: 18px; }
   #map { height: 100vh; min-height: 100vh; }
