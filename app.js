@@ -202,8 +202,10 @@ function setupAutocomplete(input, suggestions) {
     timer = window.setTimeout(async () => {
       const requestId = ++requestNumber;
       try {
-        const params = new URLSearchParams({ size: '6', text: query, 'focus.point.lat': '40.735', 'focus.point.lon': '-73.99' });
-        const photonParams = new URLSearchParams({ q: `${query}, New York, NY`, limit: '6', lat: '40.735', lon: '-73.99', bbox: '-74.26,40.49,-73.70,40.92' });
+        // Ask both services for a wider candidate pool, then rank locally. Asking
+        // for only six first means the provider's ranking can hide the closest POI.
+        const params = new URLSearchParams({ size: '20', text: query, 'focus.point.lat': '40.735', 'focus.point.lon': '-73.99' });
+        const photonParams = new URLSearchParams({ q: `${query}, New York, NY`, limit: '30', lat: '40.735', lon: '-73.99', bbox: '-74.26,40.49,-73.70,40.92' });
         const [data, photonData] = await Promise.all([
           fetchJson(`https://geosearch.planninglabs.nyc/v2/autocomplete?${params}`, 'NYC place search').catch(() => ({ features: [] })),
           fetchJson(`https://photon.komoot.io/api/?${photonParams}`, 'OpenStreetMap place search').catch(() => ({ features: [] }))
@@ -218,17 +220,46 @@ function setupAutocomplete(input, suggestions) {
         const features = [...photonFeatures, ...geosearchFeatures].filter((feature, index, all) => {
           const label = feature.properties?.label || feature.properties?.name || '';
           return label && all.findIndex(candidate => (candidate.properties?.label || candidate.properties?.name || '') === label) === index;
-        }).slice(0, 6);
-        if (!features.length) return;
-        suggestions.innerHTML = features.map((feature, index) => {
+        });
+        const searchCenter = currentOrigin || map.getCenter();
+        const normalizedQuery = query.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
+        const featureDistance = feature => {
+          const coordinates = feature.geometry?.coordinates;
+          if (!Array.isArray(coordinates) || coordinates.length < 2) return Infinity;
+          return distanceMeters(
+            { lat: Number(coordinates[1]), lon: Number(coordinates[0]) },
+            { lat: Number(searchCenter.lat), lon: Number(searchCenter.lng ?? searchCenter.lon) }
+          );
+        };
+        const featureScore = feature => {
+          const properties = feature.properties || {};
+          const name = String(properties.name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+          const tokenMatches = queryTokens.filter(token => name.includes(token)).length;
+          const exactName = name === normalizedQuery ? 0 : name.startsWith(normalizedQuery) ? 1 : tokenMatches === queryTokens.length ? 2 : 3;
+          return [exactName, -tokenMatches, featureDistance(feature)];
+        };
+        features.sort((a, b) => {
+          const aScore = featureScore(a);
+          const bScore = featureScore(b);
+          for (let index = 0; index < aScore.length; index += 1) {
+            if (aScore[index] !== bScore[index]) return aScore[index] - bScore[index];
+          }
+          return 0;
+        });
+        const rankedFeatures = features.slice(0, 6);
+        if (!rankedFeatures.length) return;
+        suggestions.innerHTML = rankedFeatures.map((feature, index) => {
           const label = feature.properties?.label || feature.properties?.name || query;
           const name = feature.properties?.name || label;
           const detail = name !== label ? label : '';
-          return `<button class="suggestion" type="button" data-index="${index}" role="option"><b>${name}</b>${detail ? `<small>${detail}</small>` : ''}</button>`;
+          const distance = featureDistance(feature);
+          const distanceLabel = Number.isFinite(distance) ? `${distance < 1000 ? `${Math.round(distance)} m` : `${(distance / 1609.34).toFixed(1)} mi`} away` : '';
+          return `<button class="suggestion" type="button" data-index="${index}" role="option"><b>${name}</b>${detail ? `<small>${detail}</small>` : ''}${distanceLabel ? `<small>${distanceLabel}</small>` : ''}</button>`;
         }).join('');
         suggestions.hidden = false;
         suggestions.querySelectorAll('.suggestion').forEach((option, index) => option.addEventListener('click', () => {
-          const feature = features[index];
+          const feature = rankedFeatures[index];
           const [lon, lat] = feature.geometry.coordinates;
           const label = feature.properties?.label || feature.properties?.name || query;
           input.value = label;
@@ -696,4 +727,3 @@ routeForm.addEventListener('submit', async (event) => {
     setStatus(error.message || 'Something went wrong.');
   } finally { button.disabled = false; }
 });
-
