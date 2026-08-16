@@ -1,0 +1,18 @@
+{
+  "source": "User-reported ground truth for MVP validation",
+  "observations": [
+    {
+      "label": "The Blavatnik Family – Chelsea Medical Center at Mount Sinai",
+      "address": "325 West 15th Street, Manhattan, NY 10011",
+      "bin": "1013043",
+      "relatedPermitAddress": "111 8 Avenue, Manhattan, NY 10011",
+      "relatedPermitSubtype": "SH",
+      "linear_feet": 2040,
+      "lat": 40.740542,
+      "lon": -74.001959,
+      "kind": "reported-sidewalk-shed",
+      "note": "Reported by project tester as a long sidewalk shed along the north side of West 15th Street. The same BIN has SH permits filed under 111 8 Avenue; the permit address does not represent every frontage of the building."
+    }
+  ]
+}
+
