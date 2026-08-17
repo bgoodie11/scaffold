@@ -8,6 +8,8 @@ const button = document.querySelector('#route-button');
 const locationButton = document.querySelector('#location-button');
 const goButton = document.querySelector('#go-button');
 const walkingIndicator = document.querySelector('#walking-indicator');
+const walkingDirection = document.querySelector('#walking-direction');
+const recenterButton = document.querySelector('#recenter-button');
 const stopWalkingButton = document.querySelector('#stop-walking-button');
 const statusEl = document.querySelector('#status');
 const resultsEl = document.querySelector('#route-results');
@@ -20,6 +22,7 @@ let navigationWatchId = null;
 let navigationMarker = null;
 let navigationAccuracy = null;
 let navigationActive = false;
+let followLocation = true;
 let currentOriginMarker = null;
 let currentOriginAccuracy = null;
 function resetControlPanelScroll() {
@@ -58,17 +61,56 @@ function setWalkingMode(active) {
   document.body.classList.toggle('walking-mode', active);
   controlPanel.classList.toggle('walking-mode', active);
   map.getContainer().classList.toggle('walking-map', active);
+  recenterButton.hidden = !active || followLocation;
 }
 
 function stopNavigation() {
   if (navigationWatchId !== null) navigator.geolocation?.clearWatch(navigationWatchId);
   navigationWatchId = null;
   navigationActive = false;
+  followLocation = true;
   setWalkingMode(false);
   goButton.textContent = 'Go on selected route';
   if (navigationMarker) { map.removeLayer(navigationMarker); navigationMarker = null; }
   if (navigationAccuracy) { map.removeLayer(navigationAccuracy); navigationAccuracy = null; }
 }
+
+function formatNavigationInstruction(step) {
+  const type = step?.maneuver?.type || 'continue';
+  const modifier = step?.maneuver?.modifier || '';
+  const street = step?.name?.trim();
+  if (type === 'arrive') return 'Arrive at your destination';
+  if (type === 'depart') return street ? `Start on ${street}` : 'Start walking';
+  const turns = { left: 'Turn left', right: 'Turn right', sharp left: 'Turn sharply left', sharp right: 'Turn sharply right', slight left: 'Bear left', slight right: 'Bear right', straight: 'Continue straight' };
+  const action = type === 'roundabout' ? 'Enter the roundabout' : turns[modifier] || (type === 'new name' ? 'Continue' : 'Continue');
+  return street ? `${action} onto ${street}` : action;
+}
+
+function updateNavigationInstruction(route, along) {
+  const steps = (route.legs || []).flatMap(leg => leg.steps || []);
+  let stepStart = 0;
+  const step = steps.find(candidate => {
+    const end = stepStart + Number(candidate.distance || 0);
+    const active = along <= end + 12;
+    stepStart = end;
+    return active;
+  }) || steps[steps.length - 1];
+  if (step) walkingDirection.textContent = formatNavigationInstruction(step);
+}
+
+map.on('dragstart', () => {
+  if (!navigationActive || !followLocation) return;
+  followLocation = false;
+  recenterButton.hidden = false;
+  setStatus('Map moved. GPS tracking continues; tap Recenter to follow yourself.');
+});
+recenterButton.addEventListener('click', () => {
+  if (!navigationMarker) return;
+  followLocation = true;
+  recenterButton.hidden = true;
+  map.panTo(navigationMarker.getLatLng(), { animate: true, duration: .25 });
+  setStatus('Following your location again.');
+});
 
 function projectOntoRoute(point, route) {
   let best = { distance: Infinity, along: 0, point: null };
@@ -96,7 +138,8 @@ function updateNavigationPosition(position) {
   else navigationMarker.setLatLng([point.lat, point.lon]);
   if (!navigationAccuracy) navigationAccuracy = L.circle([point.lat, point.lon], { radius: accuracy, color: '#2878d0', weight: 1, opacity: .45, fillColor: '#2878d0', fillOpacity: .12 }).addTo(map);
   else { navigationAccuracy.setLatLng([point.lat, point.lon]); navigationAccuracy.setRadius(accuracy); }
-  if (navigationActive) map.panTo([point.lat, point.lon], { animate: true, duration: .25 });
+  updateNavigationInstruction(selectedRoute, progress.along);
+  if (navigationActive && followLocation) map.panTo([point.lat, point.lon], { animate: true, duration: .25 });
   if (remaining < 30 || progress.distance < 18 && remaining < 60) {
     setStatus('You’re at the destination.');
     goButton.textContent = 'Arrived';
@@ -114,6 +157,7 @@ function startNavigation() {
   if (!navigator.geolocation) { setStatus('This device does not provide location services.'); return; }
   if (navigationActive) { stopNavigation(); setStatus('Walking mode paused.'); return; }
   navigationActive = true;
+  followLocation = true;
   setWalkingMode(true);
   goButton.textContent = 'Pause walking mode';
   setStatus('Waiting for your location…');
