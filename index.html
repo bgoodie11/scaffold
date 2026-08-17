@@ -35,7 +35,8 @@
         <div id="status" class="status" role="status">Ready for a route.</div>
         <div id="walking-indicator" class="walking-indicator" hidden>
           <span class="walking-pulse" aria-hidden="true"></span>
-          <span><b>Walking mode</b><small>GPS tracking is active</small></span>
+          <span><b>Walking mode</b><small id="walking-direction">GPS tracking is active</small><small id="walking-side">Orange frontage marks the sidewalk side to use.</small></span>
+          <button id="recenter-button" type="button" hidden>Recenter</button>
           <button id="stop-walking-button" type="button">Stop</button>
         </div>
         <div id="route-results" class="route-results" hidden></div>
@@ -50,4 +51,3 @@
     <script src="app.js"></script>
   </body>
 </html>
-
