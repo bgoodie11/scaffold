@@ -149,7 +149,8 @@ function updateNavigationPosition(position) {
     setWalkingMode(false);
     return;
   }
-  setStatus(`${Math.round(remaining)} m remaining · GPS accuracy ±${accuracy} m`);
+  const minutesRemaining = Math.max(1, Math.round((remaining / Math.max(selectedRoute.distance, 1)) * (selectedRoute.duration / 60)));
+  setStatus(`${Math.round(remaining)} m remaining · about ${minutesRemaining} min remaining · GPS accuracy ±${accuracy} m`);
 }
 
 function startNavigation() {
@@ -208,6 +209,13 @@ function requestCurrentLocation(onSuccess, onError = null) {
   }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
 }
 
+async function reverseGeocode(point) {
+  const params = new URLSearchParams({ 'point.lat': String(point.lat), 'point.lon': String(point.lon) });
+  const data = await fetchJson(`https://geosearch.planninglabs.nyc/v2/reverse?${params}`, 'NYC address lookup');
+  const feature = data.features?.[0];
+  return feature?.properties?.label || null;
+}
+
 locationButton.addEventListener('click', () => {
   setStatus('Location button clicked. Checking browser permission…');
   locationButton.disabled = true;
@@ -215,11 +223,18 @@ locationButton.addEventListener('click', () => {
   requestCurrentLocation(position => {
     currentOrigin = { lat: position.coords.latitude, lon: position.coords.longitude, label: 'Current location' };
     showCurrentOrigin(position);
-    document.querySelector('#origin').value = 'Current location';
+    const originInput = document.querySelector('#origin');
+    originInput.value = 'Current location';
     locationButton.disabled = false;
     locationButton.textContent = 'Location set';
     setStatus('Current location set as the route start.');
     map.setView([currentOrigin.lat, currentOrigin.lon], 16);
+    reverseGeocode(currentOrigin).then(label => {
+      if (!label || currentOrigin.label !== 'Current location') return;
+      currentOrigin.label = label;
+      originInput.value = label;
+      setStatus(`Starting point set to ${label}.`);
+    }).catch(() => { /* Keep the usable Current location label if reverse lookup is unavailable. */ });
   }, error => {
     locationButton.disabled = false;
     locationButton.textContent = 'Use my current location';
@@ -730,7 +745,7 @@ routeForm.addEventListener('submit', async (event) => {
     const destinationValue = destinationInput.value.trim();
     const selectedOrigin = selectedLocations.get(originInput);
     const selectedDestination = selectedLocations.get(destinationInput);
-    const start = currentOrigin && originValue === 'Current location' ? currentOrigin : selectedOrigin?.label === originValue ? selectedOrigin : await geocode(originValue);
+    const start = currentOrigin && (originValue === 'Current location' || originValue === currentOrigin.label) ? currentOrigin : selectedOrigin?.label === originValue ? selectedOrigin : await geocode(originValue);
     const end = selectedDestination?.label === destinationValue ? selectedDestination : await geocode(destinationValue);
     setStatus('Calculating walking alternatives…');
     let routes = await getRoutes(start, end);
