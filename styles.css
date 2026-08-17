@@ -84,3 +84,8 @@ button:disabled { opacity: .55; cursor: wait; }
   #map { height: 100vh; min-height: 100vh; }
   .walking-mode .control-panel { top: 10px; left: 10px; width: calc(100vw - 20px); padding: 8px; }
 }
+/* Some iOS web views report a wider layout viewport than the physical screen. */
+@media (pointer: coarse) and (max-height: 1100px), (max-width: 1100px) {
+  .control-panel { top: 12px; left: 12px; transform: none; width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+  .walking-mode .control-panel, .control-panel.walking-mode { top: 10px; left: 10px; width: min(520px, calc(100vw - 20px)); }
+}
