@@ -81,7 +81,7 @@ function formatNavigationInstruction(step) {
   const street = step?.name?.trim();
   if (type === 'arrive') return 'Arrive at your destination';
   if (type === 'depart') return street ? `Start on ${street}` : 'Start walking';
-  const turns = { left: 'Turn left', right: 'Turn right', sharp left: 'Turn sharply left', sharp right: 'Turn sharply right', slight left: 'Bear left', slight right: 'Bear right', straight: 'Continue straight' };
+  const turns = { left: 'Turn left', right: 'Turn right', 'sharp left': 'Turn sharply left', 'sharp right': 'Turn sharply right', 'slight left': 'Bear left', 'slight right': 'Bear right', straight: 'Continue straight' };
   const action = type === 'roundabout' ? 'Enter the roundabout' : turns[modifier] || (type === 'new name' ? 'Continue' : 'Continue');
   return street ? `${action} onto ${street}` : action;
 }
