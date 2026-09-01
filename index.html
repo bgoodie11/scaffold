@@ -7,13 +7,13 @@
     <title>ScaffoldMaxNYC - Walk drier through New York</title>
     <link rel="preconnect" href="https://unpkg.com" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-    <link rel="stylesheet" href="styles.css?v=20260901-sheds" />
+    <link rel="stylesheet" href="styles.css?v=20260901-sheds2" />
   </head>
   <body>
     <main class="app-shell">
       <section class="control-panel" aria-label="Route controls">
         <header class="app-header">
-          <a class="back-link" href="https://brettgoodman.com/" aria-label="Back to Brett Goodman's website">â brettgoodman.com</a>
+          <a class="back-link" href="https://brettgoodman.com/" aria-label="Back to Brett Goodman's website">Back to brettgoodman.com</a>
           <button class="text-button" id="about-button" type="button">About this build</button>
         </header>
         <div class="panel-title">
@@ -23,7 +23,7 @@
         </div>
 
         <div id="search-summary" class="search-summary" hidden>
-          <span><b id="summary-origin"></b><i aria-hidden="true">â</i><b id="summary-destination"></b></span>
+          <span><b id="summary-origin"></b><i aria-hidden="true">to</i><b id="summary-destination"></b></span>
           <button id="edit-search-button" class="text-button" type="button">Edit</button>
         </div>
 
@@ -66,7 +66,7 @@
       <h2>A routing experiment for sidewalk-shed city life.</h2>
       <p>ScaffoldMax compares nearby walking routes, then scores each one by its likely exposure to active NYC sidewalk sheds.</p>
       <dl><div><dt>Data</dt><dd>NYC DOB active sidewalk-shed permits, OpenStreetMap routes and NYC building footprints.</dd></div><div><dt>Approach</dt><dd>Test nearby parallel streets, infer likely building frontage and keep detours within 12% of the shortest route.</dd></div><div><dt>Limits</dt><dd>Permit locations and inferred cover are approximate. This is a prototype, not a guarantee that a block is passable or dry.</dd></div></dl>
-      <p class="dialog-links">Built by <a href="https://brettgoodman.com/">Brett Goodman</a> Â· <a href="https://github.com/bgoodie11/scaffold">View the code</a></p>
+      <p class="dialog-links">Built by <a href="https://brettgoodman.com/">Brett Goodman</a> / <a href="https://github.com/bgoodie11/scaffold">View the code</a></p>
     </dialog>
     <dialog id="data-dialog" class="info-dialog">
       <button class="dialog-close" type="button" aria-label="Close">Ã</button>
@@ -75,6 +75,6 @@
       <p id="data-provenance">Results use NYC sidewalk-shed permits and OpenStreetMap walking routes. Coverage is estimated from nearby building frontage.</p>
     </dialog>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="app.js?v=20260901-sheds"></script>
+    <script src="app.js?v=20260901-sheds2"></script>
   </body>
 </html>
