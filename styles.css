@@ -73,13 +73,14 @@ button:disabled { opacity: .55; cursor: wait; }
 .alternatives { display: grid; gap: 8px; }
 .sticky-action { position: sticky; z-index: 5; bottom: -1px; padding-top: 8px; background: linear-gradient(transparent, #f8faf7 22%); }
 .go-button { width: 100%; margin: 0; background: #d96f28; box-shadow: 0 8px 20px rgba(111,55,20,.2); }
-#map, .leaflet-container { width: 100%; height: 100%; min-height: 520px; background: #dce7df; }
+#map, .leaflet-container { width: 100%; height: 100%; min-height: 520px; background: #edf1ec; }
 .leaflet-container { overflow: hidden; }
 .leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-tile-container { position: absolute; left: 0; top: 0; }
 .leaflet-tile { width: 256px !important; height: 256px !important; max-width: none !important; }
 .leaflet-tile-container { width: 256px; height: 256px; }
 .leaflet-tile-pane { z-index: 2; }
-.muted-basemap { filter: saturate(.52) contrast(.88) brightness(1.07); opacity: .82; }
+.leaflet-gl-layer { z-index: 1; }
+.maplibregl-canvas { outline: none; }
 .route-line { filter: drop-shadow(0 1px 1px rgba(20, 45, 29, .18)); }
 .shed-line { filter: drop-shadow(0 1px 1px rgba(108, 52, 13, .22)); }
 .shed-line--reported { stroke-dashoffset: 1; }
@@ -113,5 +114,4 @@ button:disabled { opacity: .55; cursor: wait; }
   .walking-mode .control-panel::before, .control-panel.walking-mode::before { display: none; }
 }
 
-@media (max-width: 760px) { .muted-basemap { opacity: .76; } }
 .map-zoomed-out .leaflet-shedMarker-pane { opacity: 0; pointer-events: none; }
