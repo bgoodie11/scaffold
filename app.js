@@ -7,7 +7,52 @@ map.createPane('shedPane');
 map.getPane('shedPane').style.zIndex = 440;
 map.createPane('shedMarkerPane');
 map.getPane('shedMarkerPane').style.zIndex = 450;
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors', className: 'muted-basemap' }).addTo(map);
+const pmtilesProtocol = new pmtiles.Protocol();
+maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
+
+const basemapFlavor = {
+  ...basemaps.namedFlavor('light'),
+  background: '#edf1ec',
+  earth: '#edf1ec',
+  park_a: '#dfeadd',
+  park_b: '#d6e4d5',
+  hospital: '#f0e8e2',
+  industrial: '#e9e8e1',
+  school: '#e8eee4',
+  wood: '#d5e2d2',
+  pedestrian: '#ece9df',
+  minor_a: '#ffffff',
+  minor_b: '#f9faf7',
+  medium: '#ffffff',
+  major_casing: '#d1d8d1',
+  major: '#fffefa',
+  highway_casing: '#c4cec6',
+  highway: '#f7f4e8',
+  buildings: '#d8ddd7',
+  water: '#c9dde1',
+  boundaries: '#b7c0b8',
+  roads_label: '#536159',
+  places_label: '#33423a',
+  water_label: '#5e7e85',
+  mask: '#edf1ec'
+};
+
+L.maplibreGL({
+  attribution: '<a href="https://protomaps.com">Protomaps</a> / <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  style: {
+    version: 8,
+    glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
+    sprite: 'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
+    sources: {
+      protomaps: {
+        type: 'vector',
+        url: `pmtiles://${new URL('data/9-nyc-basemap.pmtiles', window.location.href).href}`,
+        attribution: '<a href="https://protomaps.com">Protomaps</a> / <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }
+    },
+    layers: basemaps.layers('protomaps', basemapFlavor, { lang: 'en' })
+  }
+}).addTo(map);
 L.control.zoom({ position: 'topright' }).addTo(map);
 
 const routeForm = document.querySelector('#route-form');
