@@ -9,6 +9,17 @@ const locationButton = document.querySelector('#location-button');
 const goButton = document.querySelector('#go-button');
 const walkingIndicator = document.querySelector('#walking-indicator');
 const walkingDirection = document.querySelector('#walking-direction');
+const walkingTitle = document.querySelector('#walking-title');
+const locationDenied = document.querySelector('#location-denied');
+const retryLocationButton = document.querySelector('#retry-location-button');
+const previewRouteButton = document.querySelector('#preview-route-button');
+const searchSummary = document.querySelector('#search-summary');
+const editSearchButton = document.querySelector('#edit-search-button');
+const summaryOrigin = document.querySelector('#summary-origin');
+const summaryDestination = document.querySelector('#summary-destination');
+const aboutDialog = document.querySelector('#about-dialog');
+const dataDialog = document.querySelector('#data-dialog');
+const dataProvenance = document.querySelector('#data-provenance');
 const recenterButton = document.querySelector('#recenter-button');
 const stopWalkingButton = document.querySelector('#stop-walking-button');
 const statusEl = document.querySelector('#status');
@@ -22,6 +33,7 @@ let navigationWatchId = null;
 let navigationMarker = null;
 let navigationAccuracy = null;
 let navigationActive = false;
+let navigationState = 'idle'; // idle | requesting | tracking | denied | preview
 let followLocation = true;
 let currentOriginMarker = null;
 let currentOriginAccuracy = null;
@@ -56,21 +68,28 @@ function showCurrentOrigin(position) {
   if (!currentOriginAccuracy) currentOriginAccuracy = L.circle(point, { radius: accuracy, color: '#2878d0', weight: 1, opacity: .45, fillColor: '#2878d0', fillOpacity: .12 }).addTo(map);
   else { currentOriginAccuracy.setLatLng(point); currentOriginAccuracy.setRadius(accuracy); }
 }
-function setWalkingMode(active) {
-  walkingIndicator.hidden = !active;
-  document.body.classList.toggle('walking-mode', active);
-  controlPanel.classList.toggle('walking-mode', active);
-  map.getContainer().classList.toggle('walking-map', active);
-  recenterButton.hidden = !active || followLocation;
+function renderNavigationState() {
+  const visible = navigationState === 'requesting' || navigationState === 'tracking' || navigationState === 'preview';
+  const compact = navigationState === 'tracking' || navigationState === 'preview';
+  walkingIndicator.hidden = !visible;
+  locationDenied.hidden = navigationState !== 'denied';
+  document.body.classList.toggle('walking-mode', compact);
+  controlPanel.classList.toggle('walking-mode', compact);
+  map.getContainer().classList.toggle('walking-map', compact);
+  recenterButton.hidden = navigationState !== 'tracking' || followLocation;
+  navigationActive = navigationState === 'tracking' || navigationState === 'requesting';
+  if (navigationState === 'requesting') { walkingTitle.textContent = 'Starting navigation'; walkingDirection.textContent = 'Waiting for location permission...'; }
+  if (navigationState === 'tracking') walkingTitle.textContent = 'Live navigation';
+  if (navigationState === 'preview') { walkingTitle.textContent = 'Route preview'; walkingDirection.textContent = 'Live location is off. Follow the highlighted route.'; }
 }
+function setNavigationState(next) { navigationState = next; renderNavigationState(); }
 
 function stopNavigation() {
   if (navigationWatchId !== null) navigator.geolocation?.clearWatch(navigationWatchId);
   navigationWatchId = null;
-  navigationActive = false;
   followLocation = true;
-  setWalkingMode(false);
-  goButton.textContent = 'Go on selected route';
+  setNavigationState('idle');
+  goButton.textContent = 'Start live navigation';
   if (navigationMarker) { map.removeLayer(navigationMarker); navigationMarker = null; }
   if (navigationAccuracy) { map.removeLayer(navigationAccuracy); navigationAccuracy = null; }
 }
@@ -145,8 +164,7 @@ function updateNavigationPosition(position) {
     goButton.textContent = 'Arrived';
     if (navigationWatchId !== null) navigator.geolocation?.clearWatch(navigationWatchId);
     navigationWatchId = null;
-    navigationActive = false;
-    setWalkingMode(false);
+    setNavigationState('idle');
     return;
   }
   const minutesRemaining = Math.max(1, Math.round((remaining / Math.max(selectedRoute.distance, 1)) * (selectedRoute.duration / 60)));
@@ -155,24 +173,37 @@ function updateNavigationPosition(position) {
 
 function startNavigation() {
   if (!selectedRoute) return;
-  if (!navigator.geolocation) { setStatus('This device does not provide location services.'); return; }
-  if (navigationActive) { stopNavigation(); setStatus('Walking mode paused.'); return; }
-  navigationActive = true;
+  if (!navigator.geolocation) { setNavigationState('denied'); setStatus('Live location is not available on this device.'); return; }
+  if (navigationState === 'tracking' || navigationState === 'preview') { stopNavigation(); setStatus('Navigation stopped.'); return; }
   followLocation = true;
-  setWalkingMode(true);
-  goButton.textContent = 'Pause walking mode';
-  setStatus('Waiting for your location…');
+  setNavigationState('requesting');
+  goButton.textContent = 'Stop navigation';
+  setStatus('Requesting your location...');
   const options = { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 };
-  navigator.geolocation.getCurrentPosition(updateNavigationPosition, error => {
-    navigationActive = false;
-    setWalkingMode(false);
-    goButton.textContent = 'Go on selected route';
-    setStatus(error.code === 1 ? 'Location permission was denied. Enable it in your browser settings.' : 'Could not get your location. Try again outside or near a window.');
-  }, options);
-  navigationWatchId = navigator.geolocation.watchPosition(updateNavigationPosition, error => {
-    if (error.code === 1) { navigationActive = false; setWalkingMode(false); setStatus('Location permission was denied.'); }
-  }, options);
+  const beginTracking = position => {
+    setNavigationState('tracking');
+    updateNavigationPosition(position);
+    if (navigationWatchId === null) navigationWatchId = navigator.geolocation.watchPosition(updateNavigationPosition, handleNavigationError, options);
+  };
+  const handleNavigationError = error => {
+    if (navigationWatchId !== null) navigator.geolocation.clearWatch(navigationWatchId);
+    navigationWatchId = null;
+    setNavigationState('denied');
+    goButton.textContent = 'Retry live navigation';
+    setStatus(error?.code === 1 ? 'Location access was denied. You can retry or preview the route without live tracking.' : 'We could not get your location. Try again or preview the route without live tracking.');
+  };
+  navigator.geolocation.getCurrentPosition(beginTracking, handleNavigationError, options);
 }
+
+retryLocationButton.addEventListener('click', startNavigation);
+previewRouteButton.addEventListener('click', () => {
+  if (!selectedRoute) return;
+  setNavigationState('preview');
+  goButton.textContent = 'Stop preview';
+  setStatus('Previewing the selected route without live tracking.');
+  const bounds = L.geoJSON(selectedRoute.geometry).getBounds();
+  if (bounds.isValid()) map.fitBounds(bounds.pad(.12));
+});
 
 function locationErrorMessage(error) {
   if (error?.code === 1) return 'Location permission was denied. In macOS, enable Location Services for your browser in System Settings → Privacy & Security → Location Services, then reload this page.';
@@ -250,6 +281,10 @@ document.querySelector('#origin').addEventListener('input', event => {
   if (event.target.value !== 'Current location') { currentOrigin = null; clearCurrentOriginMarker(); }
 });
 goButton.addEventListener('click', startNavigation);
+editSearchButton.addEventListener('click', () => { controlPanel.classList.remove('has-results'); searchSummary.hidden = true; controlPanel.scrollTop = 0; });
+document.querySelector('#about-button').addEventListener('click', () => aboutDialog.showModal());
+document.querySelectorAll('.dialog-close').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
+document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); }));
 stopWalkingButton.addEventListener('click', () => {
   stopNavigation();
   setStatus('Walking mode stopped.');
@@ -704,29 +739,46 @@ function drawCoverageLines(routes, shedPoints) {
   });
 }
 
+function routeStreetLabel(route, index) {
+  const names = (route.legs || []).flatMap(leg => (leg.steps || []).map(step => step.name?.trim())).filter(Boolean);
+  const unique = [...new Set(names.filter(name => !/^(unnamed|footway)$/i.test(name)))];
+  return unique.length ? unique.slice(0, 2).join(' via ') : `Route ${index + 1}`;
+}
+function formatDistance(route) { return route.distance < 1000 ? `${Math.round(route.distance)} m` : `${(route.distance / 1000).toFixed(1)} km`; }
 function showRoutes(routes, scored, preference) {
   routeLayers.forEach(layer => map.removeLayer(layer));
   coverageLayers.clearLayers();
   routeLayers = routes.map(route => L.geoJSON(route.geometry).addTo(map));
+  const order = [scored.selected, ...routes.map((_, index) => index).filter(index => index !== scored.selected)];
+  const recommendation = routes[scored.selected];
+  const cardMarkup = (index, recommended = false) => {
+    const route = routes[index];
+    const timeDelta = Math.round((route.duration - recommendation.duration) / 60);
+    const coverDelta = scored.coverage[index].coveredPercent - scored.coverage[scored.selected].coveredPercent;
+    const tradeoff = recommended ? `${scored.coverage[index].coveredPercent}% likely covered` : `${timeDelta >= 0 ? '+' : ''}${timeDelta} min · ${coverDelta >= 0 ? '+' : ''}${coverDelta}% cover`;
+    return `<div class="route-card ${recommended ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${recommended ? 'true' : 'false'}" data-route-index="${index}"><div class="route-card-top"><b class="route-badge">${recommended ? 'Recommended' : 'Alternative'}</b><span class="route-metrics">${formatDistance(route)} · ${Math.round(route.duration / 60)} min</span></div><strong class="route-name">${routeStreetLabel(route, index)}</strong><span>${tradeoff}</span><small>${preference === 'min' ? `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'}` : `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'} favored`}</small></div>`;
+  };
+  resultsEl.hidden = false;
+  const alternativeCount = Math.max(0, routes.length - 1);
+  resultsEl.innerHTML = `<div class="results-heading"><strong>${routes.length} route${routes.length === 1 ? '' : 's'} found</strong><button class="info-button" type="button" aria-label="How route data was calculated">Data info</button></div>${cardMarkup(order[0], true)}${alternativeCount ? `<button class="compare-button" type="button" aria-expanded="false">Compare ${alternativeCount} alternative${alternativeCount === 1 ? '' : 's'}</button><div class="alternatives" hidden>${order.slice(1).map(index => cardMarkup(index)).join('')}</div>` : ''}`;
   const updateSelection = selected => {
     selectedRoute = routes[selected];
     goButton.hidden = false;
-    routeLayers.forEach((layer, index) => layer.setStyle({ color: index === selected ? '#24683c' : '#9aafa0', weight: index === selected ? 7 : 4, opacity: index === selected ? 0.95 : 0.7 }));
-    resultsEl.querySelectorAll('.route-card').forEach((card, index) => {
-      card.classList.toggle('selected', index === selected);
-      card.setAttribute('aria-pressed', index === selected ? 'true' : 'false');
-    });
-    setStatus(`${selected === scored.selected ? 'Recommended' : 'Selected alternative'} route: ${Math.round(routes[selected].distance)} m, ${Math.round(routes[selected].duration / 60)} min.`);
+    routeLayers.forEach((layer, index) => layer.setStyle({ color: index === selected ? '#24683c' : '#9aafa0', weight: index === selected ? 7 : 4, opacity: index === selected ? .96 : .58 }));
+    resultsEl.querySelectorAll('.route-card').forEach(card => { const active = Number(card.dataset.routeIndex) === selected; card.classList.toggle('selected', active); card.setAttribute('aria-pressed', active ? 'true' : 'false'); });
+    setStatus(`${routes.length} routes found · ${selected === scored.selected ? 'Recommended' : 'Alternative'} selected`);
   };
-  resultsEl.hidden = false;
-  resultsEl.innerHTML = routes.map((route, index) => `<div class="route-card ${index === scored.selected ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${index === scored.selected ? 'true' : 'false'}" data-route-index="${index}"><strong>${index === scored.selected ? 'Recommended' : 'Alternative'} · ${route.distance < 1000 ? `${Math.round(route.distance)} m` : `${(route.distance / 1000).toFixed(1)} km`} · ${Math.round(route.duration / 60)} min</strong><span>${scored.coverage[index].coveredPercent}% estimated covered · ${scored.coverage[index].uncoveredPercent}% estimated uncovered</span><small>${preference === 'min' ? `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'}` : `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'} favored`}</small></div>`).join('');
   resultsEl.querySelectorAll('.route-card').forEach(card => {
     const select = () => updateSelection(Number(card.dataset.routeIndex));
     card.addEventListener('click', select);
     card.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(); } });
   });
+  resultsEl.querySelector('.info-button').addEventListener('click', () => dataDialog.showModal());
+  const compare = resultsEl.querySelector('.compare-button');
+  if (compare) compare.addEventListener('click', () => { const alternatives = resultsEl.querySelector('.alternatives'); alternatives.hidden = !alternatives.hidden; compare.setAttribute('aria-expanded', String(!alternatives.hidden)); compare.textContent = alternatives.hidden ? `Compare ${alternativeCount} alternative${alternativeCount === 1 ? '' : 's'}` : 'Hide alternatives'; });
   drawCoverageLines(routes, scored.shedPoints);
   updateSelection(scored.selected);
+  requestAnimationFrame(() => resultsEl.querySelector('.route-card.selected')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
 }
 
 routeForm.addEventListener('submit', async (event) => {
@@ -734,7 +786,7 @@ routeForm.addEventListener('submit', async (event) => {
   stopNavigation();
   selectedRoute = null;
   goButton.hidden = true;
-  button.disabled = true; resultsEl.hidden = true;
+  button.disabled = true; resultsEl.hidden = true; controlPanel.classList.remove('has-results'); searchSummary.hidden = true; locationDenied.hidden = true;
   try {
     if (window.location.protocol === 'file:') throw new Error('Please run this app through http://localhost:8000; browsers block its data services when index.html is opened directly.');
     const preference = new FormData(routeForm).get('preference');
@@ -788,7 +840,12 @@ routeForm.addEventListener('submit', async (event) => {
     showRoutes(routes, { selected, exposures, coverage, shedPoints: allShedPoints }, preference);
     const bounds = L.featureGroup(routeLayers).getBounds();
     if (bounds.isValid()) map.fitBounds(bounds.pad(0.12));
-    setStatus(scaffoldWarning || `Loaded ${scaffoldResult.plotted} permit sheds and ${observedPoints.length} reported sheds from ${permits.length} filtered SH permits (${scaffoldSource}). Route ranking is approximate while permit geometry is being inferred.`);
+    summaryOrigin.textContent = originValue.replace(', New York, NY', '');
+    summaryDestination.textContent = destinationValue.replace(', New York, NY', '');
+    searchSummary.hidden = false;
+    controlPanel.classList.add('has-results');
+    dataProvenance.textContent = `${scaffoldResult.plotted} permit sheds and ${observedPoints.length} field reports were compared across ${permits.length} active sidewalk-shed permits (${scaffoldSource}). Route ranking and likely cover are approximate because exact canopy geometry is not available.${scaffoldWarning}`;
+    setStatus(`${routes.length} route${routes.length === 1 ? '' : 's'} found`);
   } catch (error) {
     setStatus(error.message || 'Something went wrong.');
   } finally { button.disabled = false; }
