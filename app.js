@@ -1,5 +1,13 @@
 const map = L.map('map', { zoomControl: false }).setView([40.735, -73.99], 13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+map.createPane('routePane');
+map.getPane('routePane').style.zIndex = 410;
+map.createPane('shedCasingPane');
+map.getPane('shedCasingPane').style.zIndex = 430;
+map.createPane('shedPane');
+map.getPane('shedPane').style.zIndex = 440;
+map.createPane('shedMarkerPane');
+map.getPane('shedMarkerPane').style.zIndex = 450;
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors', className: 'muted-basemap' }).addTo(map);
 L.control.zoom({ position: 'topright' }).addTo(map);
 
 const routeForm = document.querySelector('#route-form');
@@ -27,6 +35,7 @@ const resultsEl = document.querySelector('#route-results');
 let routeLayers = [];
 let scaffoldLayer = L.layerGroup().addTo(map);
 let coverageLayers = L.layerGroup().addTo(map);
+let lastCoverageData = null;
 let currentOrigin = null;
 let selectedRoute = null;
 let navigationWatchId = null;
@@ -43,6 +52,9 @@ function resetControlPanelScroll() {
 window.addEventListener('pageshow', resetControlPanelScroll);
 window.requestAnimationFrame(resetControlPanelScroll);
 window.addEventListener('resize', () => map.invalidateSize());
+function syncMapDensity() { map.getContainer().classList.toggle('map-zoomed-out', map.getZoom() < 15); }
+map.on('zoomend', () => { syncMapDensity(); if (lastCoverageData) drawCoverageLines(lastCoverageData.routes, lastCoverageData.shedPoints); });
+syncMapDensity();
 setTimeout(() => map.invalidateSize(), 0);
 
 const geocodeCache = new Map();
@@ -160,7 +172,7 @@ function updateNavigationPosition(position) {
   updateNavigationInstruction(selectedRoute, progress.along);
   if (navigationActive && followLocation) map.panTo([point.lat, point.lon], { animate: true, duration: .25 });
   if (remaining < 30 || progress.distance < 18 && remaining < 60) {
-    setStatus('You’re at the destination.');
+    setStatus('Youâre at the destination.');
     goButton.textContent = 'Arrived';
     if (navigationWatchId !== null) navigator.geolocation?.clearWatch(navigationWatchId);
     navigationWatchId = null;
@@ -168,7 +180,7 @@ function updateNavigationPosition(position) {
     return;
   }
   const minutesRemaining = Math.max(1, Math.round((remaining / Math.max(selectedRoute.distance, 1)) * (selectedRoute.duration / 60)));
-  setStatus(`${Math.round(remaining)} m remaining · about ${minutesRemaining} min remaining · GPS accuracy ±${accuracy} m`);
+  setStatus(`${Math.round(remaining)} m remaining Â· about ${minutesRemaining} min remaining Â· GPS accuracy Â±${accuracy} m`);
 }
 
 function startNavigation() {
@@ -206,7 +218,7 @@ previewRouteButton.addEventListener('click', () => {
 });
 
 function locationErrorMessage(error) {
-  if (error?.code === 1) return 'Location permission was denied. In macOS, enable Location Services for your browser in System Settings → Privacy & Security → Location Services, then reload this page.';
+  if (error?.code === 1) return 'Location permission was denied. In macOS, enable Location Services for your browser in System Settings â Privacy & Security â Location Services, then reload this page.';
   if (error?.code === 2) return 'Your Mac could not determine a location. Check Wi-Fi/location services and try again near a window.';
   if (error?.code === 3) return 'Location lookup timed out. Try again, or check that this site is running on localhost or HTTPS.';
   return 'Could not get your location. Try again.';
@@ -223,7 +235,7 @@ function requestCurrentLocation(onSuccess, onError = null) {
     fail('This browser does not provide location services.');
     return;
   }
-  setStatus('Requesting your location… If no prompt appears, check browser and macOS Location Services permissions.');
+  setStatus('Requesting your locationâ¦ If no prompt appears, check browser and macOS Location Services permissions.');
   let finished = false;
   const timeout = window.setTimeout(() => {
     if (!finished) setStatus('Still waiting for location. Check the browser location icon or macOS Location Services permission.');
@@ -248,9 +260,9 @@ async function reverseGeocode(point) {
 }
 
 locationButton.addEventListener('click', () => {
-  setStatus('Location button clicked. Checking browser permission…');
+  setStatus('Location button clicked. Checking browser permissionâ¦');
   locationButton.disabled = true;
-  locationButton.textContent = 'Locating…';
+  locationButton.textContent = 'Locatingâ¦';
   requestCurrentLocation(position => {
     currentOrigin = { lat: position.coords.latitude, lon: position.coords.longitude, label: 'Current location' };
     showCurrentOrigin(position);
@@ -394,7 +406,7 @@ async function geocode(query) {
   const url = `https://geosearch.planninglabs.nyc/v2/search?size=1&text=${encodeURIComponent(query)}`;
   const places = await fetchJson(url, 'NYC address search', { headers: { Accept: 'application/json' } });
   const feature = places.features?.[0];
-  if (!feature) throw new Error(`Could not find “${query}”.`);
+  if (!feature) throw new Error(`Could not find â${query}â.`);
   const [lon, lat] = feature.geometry.coordinates;
   const point = { lat: Number(lat), lon: Number(lon), label: feature.properties?.label || query };
   geocodeCache.set(query, point);
@@ -560,7 +572,7 @@ async function getNearbyBuildingBins(routePointsForSearch) {
   if (!routePointsForSearch.length) return new Set();
   const lats = routePointsForSearch.map(point => point.lat);
   const lons = routePointsForSearch.map(point => point.lon);
-  const buffer = 0.0006; // roughly 50–70 m around the walking line's bounding box
+  const buffer = 0.0006; // roughly 50â70 m around the walking line's bounding box
   const geometry = JSON.stringify({
     xmin: Math.min(...lons) - buffer,
     ymin: Math.min(...lats) - buffer,
@@ -610,7 +622,7 @@ async function mapScaffolds(rows, routePointsForSearch, routeStreetNames = []) {
       const frontage = footprint ? footprintToRouteDistance(footprint, routePointsForSearch) : { distance: nearestDistance(point, routePointsForSearch), point };
       if (frontage.distance > SHED_MATCH_RADIUS_METERS) return;
       const mapPoint = frontage.point || point;
-      L.marker([mapPoint.lat, mapPoint.lon], { icon: L.divIcon({ className: 'scaffold-dot', iconSize: [13, 13] }) })
+      L.marker([mapPoint.lat, mapPoint.lon], { pane: 'shedMarkerPane', icon: L.divIcon({ className: 'scaffold-dot', iconSize: [12, 12], iconAnchor: [6, 6] }) })
         .bindPopup(`<b>Active sidewalk shed</b><br>${address}<br><small>${row.linear_feet ? `${Number(row.linear_feet).toLocaleString()} linear feet reported` : 'Linear footage unavailable'}<br>Building-frontage proxy: ${Math.round(frontage.distance)} m from route</small>`)
         .addTo(scaffoldLayer);
       // The active-shed CSV coordinate is often a permit/building centroid or
@@ -635,7 +647,7 @@ function mapKnownObservations(observations, routePointsForSearch) {
   observations.forEach(observation => {
     const point = { lat: Number(observation.lat), lon: Number(observation.lon) };
     if (!Number.isFinite(point.lat) || !Number.isFinite(point.lon) || nearestDistance(point, routePointsForSearch) > 700) return;
-    L.marker([point.lat, point.lon], { icon: L.divIcon({ className: 'reported-shed-dot', iconSize: [15, 15] }) })
+    L.marker([point.lat, point.lon], { pane: 'shedMarkerPane', icon: L.divIcon({ className: 'reported-shed-dot', iconSize: [14, 14], iconAnchor: [7, 7] }) })
       .bindPopup(`<b>Sidewalk shed frontage</b><br>${observation.label}<br><small>${observation.address}<br>Related permit: ${observation.relatedPermitAddress || 'not found'} (${observation.relatedPermitSubtype || 'reported'})<br>${observation.note}</small>`)
       .addTo(scaffoldLayer);
     points.push({ ...point, sidePoint: point, geometry: null, linearFeet: 0, confidence: 'reported' });
@@ -673,7 +685,13 @@ function routeEvidencePositions(route, shedPoints) {
   });
 }
 
-function offsetTowardSide(a, b, sidePoint, meters = 11) {
+function offsetTowardSide(a, b, sidePoint, meters = null) {
+  // Keep the shed visibly beside the route at neighborhood zooms without
+  // letting the visual offset drift far from its inferred building frontage.
+  if (meters == null) {
+    const metersPerPixel = 156543.03392 * Math.cos(a.lat * Math.PI / 180) / Math.pow(2, map.getZoom());
+    meters = Math.max(10, Math.min(30, metersPerPixel * 3.25));
+  }
   if (!sidePoint) return [[a.lat, a.lon], [b.lat, b.lon]];
   const midpoint = { lat: (a.lat + b.lat) / 2, lon: (a.lon + b.lon) / 2 };
   const scale = 111320;
@@ -714,6 +732,10 @@ function routeCoverage(route, shedPoints) {
 
 function drawCoverageLines(routes, shedPoints) {
   coverageLayers.clearLayers();
+  lastCoverageData = { routes, shedPoints };
+  const zoom = map.getZoom();
+  const innerWeight = zoom <= 13 ? 3 : zoom <= 15 ? 4 : 5;
+  const casingWeight = innerWeight + 4;
   routes.forEach(route => {
     const coordinates = route.geometry.coordinates;
     const evidencePositions = routeEvidencePositions(route, shedPoints);
@@ -731,8 +753,17 @@ function drawCoverageLines(routes, shedPoints) {
       if (evidence) {
         const line = offsetTowardSide(a, b, evidence.point.sidePoint);
         const isReported = evidence.point.confidence === 'reported';
-        L.polyline(line, { color: '#fffaf1', weight: 9, opacity: 0.92, lineCap: 'round', dashArray: isReported ? '5 7' : null }).addTo(coverageLayers);
-        L.polyline(line, { color: '#e38b35', weight: 5, opacity: isReported ? 0.68 : 0.96, lineCap: 'round', dashArray: isReported ? '5 7' : null }).addTo(coverageLayers);
+        const dash = isReported ? '2 7' : null;
+        L.polyline(line, {
+          pane: 'shedCasingPane', className: 'shed-line-casing', color: '#fffdf8',
+          weight: casingWeight, opacity: isReported ? 0.76 : 0.94,
+          lineCap: 'round', lineJoin: 'round', dashArray: dash
+        }).addTo(coverageLayers);
+        L.polyline(line, {
+          pane: 'shedPane', className: `shed-line ${isReported ? 'shed-line--reported' : 'shed-line--permit'}`,
+          color: isReported ? '#b85f22' : '#f07822', weight: innerWeight,
+          opacity: isReported ? 0.82 : 0.98, lineCap: 'round', lineJoin: 'round', dashArray: dash
+        }).addTo(coverageLayers);
       }
       along += segmentMeters;
     }
@@ -748,15 +779,15 @@ function formatDistance(route) { return route.distance < 1000 ? `${Math.round(ro
 function showRoutes(routes, scored, preference) {
   routeLayers.forEach(layer => map.removeLayer(layer));
   coverageLayers.clearLayers();
-  routeLayers = routes.map(route => L.geoJSON(route.geometry).addTo(map));
+  routeLayers = routes.map(route => L.geoJSON(route.geometry, { pane: 'routePane', className: 'route-line' }).addTo(map));
   const order = [scored.selected, ...routes.map((_, index) => index).filter(index => index !== scored.selected)];
   const recommendation = routes[scored.selected];
   const cardMarkup = (index, recommended = false) => {
     const route = routes[index];
     const timeDelta = Math.round((route.duration - recommendation.duration) / 60);
     const coverDelta = scored.coverage[index].coveredPercent - scored.coverage[scored.selected].coveredPercent;
-    const tradeoff = recommended ? `${scored.coverage[index].coveredPercent}% likely covered` : `${timeDelta >= 0 ? '+' : ''}${timeDelta} min · ${coverDelta >= 0 ? '+' : ''}${coverDelta}% cover`;
-    return `<div class="route-card ${recommended ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${recommended ? 'true' : 'false'}" data-route-index="${index}"><div class="route-card-top"><b class="route-badge">${recommended ? 'Recommended' : 'Alternative'}</b><span class="route-metrics">${formatDistance(route)} · ${Math.round(route.duration / 60)} min</span></div><strong class="route-name">${routeStreetLabel(route, index)}</strong><span>${tradeoff}</span><small>${preference === 'min' ? `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'}` : `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'} favored`}</small></div>`;
+    const tradeoff = recommended ? `${scored.coverage[index].coveredPercent}% likely covered` : `${timeDelta >= 0 ? '+' : ''}${timeDelta} min Â· ${coverDelta >= 0 ? '+' : ''}${coverDelta}% cover`;
+    return `<div class="route-card ${recommended ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${recommended ? 'true' : 'false'}" data-route-index="${index}"><div class="route-card-top"><b class="route-badge">${recommended ? 'Recommended' : 'Alternative'}</b><span class="route-metrics">${formatDistance(route)} Â· ${Math.round(route.duration / 60)} min</span></div><strong class="route-name">${routeStreetLabel(route, index)}</strong><span>${tradeoff}</span><small>${preference === 'min' ? `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'}` : `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'} favored`}</small></div>`;
   };
   resultsEl.hidden = false;
   const alternativeCount = Math.max(0, routes.length - 1);
@@ -766,7 +797,7 @@ function showRoutes(routes, scored, preference) {
     goButton.hidden = false;
     routeLayers.forEach((layer, index) => layer.setStyle({ color: index === selected ? '#24683c' : '#9aafa0', weight: index === selected ? 7 : 4, opacity: index === selected ? .96 : .58 }));
     resultsEl.querySelectorAll('.route-card').forEach(card => { const active = Number(card.dataset.routeIndex) === selected; card.classList.toggle('selected', active); card.setAttribute('aria-pressed', active ? 'true' : 'false'); });
-    setStatus(`${routes.length} routes found · ${selected === scored.selected ? 'Recommended' : 'Alternative'} selected`);
+    setStatus(`${routes.length} routes found Â· ${selected === scored.selected ? 'Recommended' : 'Alternative'} selected`);
   };
   resultsEl.querySelectorAll('.route-card').forEach(card => {
     const select = () => updateSelection(Number(card.dataset.routeIndex));
@@ -790,7 +821,7 @@ routeForm.addEventListener('submit', async (event) => {
   try {
     if (window.location.protocol === 'file:') throw new Error('Please run this app through http://localhost:8000; browsers block its data services when index.html is opened directly.');
     const preference = new FormData(routeForm).get('preference');
-    setStatus('Finding both places…');
+    setStatus('Finding both placesâ¦');
     const originInput = document.querySelector('#origin');
     const destinationInput = document.querySelector('#destination');
     const originValue = originInput.value.trim();
@@ -799,10 +830,10 @@ routeForm.addEventListener('submit', async (event) => {
     const selectedDestination = selectedLocations.get(destinationInput);
     const start = currentOrigin && (originValue === 'Current location' || originValue === currentOrigin.label) ? currentOrigin : selectedOrigin?.label === originValue ? selectedOrigin : await geocode(originValue);
     const end = selectedDestination?.label === destinationValue ? selectedDestination : await geocode(destinationValue);
-    setStatus('Calculating walking alternatives…');
+    setStatus('Calculating walking alternativesâ¦');
     let routes = await getRoutes(start, end);
     const baseRoute = routes.reduce((shortestRoute, route) => route.distance < shortestRoute.distance ? route : shortestRoute, routes[0]);
-    setStatus('Exploring nearby parallel streets…');
+    setStatus('Exploring nearby parallel streetsâ¦');
     const parallelRoutes = await getParallelCandidates(start, end, baseRoute);
     routes = [...new Map([...routes, ...parallelRoutes].map(route => [routeKey(route), route])).values()];
     const shortestDistance = Math.min(...routes.map(route => route.distance));
@@ -813,7 +844,7 @@ routeForm.addEventListener('submit', async (event) => {
     let scaffoldResult = { plotted: 0, points: [] };
     let scaffoldWarning = '';
     let scaffoldSource = 'local snapshot';
-    setStatus('Loading cached NYC scaffold permits…');
+    setStatus('Loading cached NYC scaffold permitsâ¦');
     try {
       const cached = await getCachedScaffolds();
       permits = cached.rows;
