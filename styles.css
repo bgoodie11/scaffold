@@ -37,6 +37,7 @@ button:disabled { opacity: .55; cursor: wait; }
 .search-summary i { color: #89938c; font-style: normal; }
 .control-panel.has-results .panel-title { display: none; }
 .control-panel.has-results form { display: none; }
+.control-panel.has-results > .status { display: none; }
 .walking-indicator { display: flex; align-items: center; gap: 9px; margin: 10px 0; padding: 10px; border: 1px solid #9bc1e8; border-radius: 10px; background: #edf6ff; color: #1c5b9c; }
 .walking-indicator > span:nth-child(2) { display: grid; gap: 2px; flex: 1; }
 .walking-indicator small { color: #527497; font-size: 11px; }
