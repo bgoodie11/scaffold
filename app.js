@@ -172,7 +172,7 @@ function updateNavigationPosition(position) {
   updateNavigationInstruction(selectedRoute, progress.along);
   if (navigationActive && followLocation) map.panTo([point.lat, point.lon], { animate: true, duration: .25 });
   if (remaining < 30 || progress.distance < 18 && remaining < 60) {
-    setStatus('You’re at the destination.');
+    setStatus('Youâre at the destination.');
     goButton.textContent = 'Arrived';
     if (navigationWatchId !== null) navigator.geolocation?.clearWatch(navigationWatchId);
     navigationWatchId = null;
@@ -180,7 +180,7 @@ function updateNavigationPosition(position) {
     return;
   }
   const minutesRemaining = Math.max(1, Math.round((remaining / Math.max(selectedRoute.distance, 1)) * (selectedRoute.duration / 60)));
-  setStatus(`${Math.round(remaining)} m remaining · about ${minutesRemaining} min remaining · GPS accuracy ±${accuracy} m`);
+  setStatus(`${Math.round(remaining)} m remaining / about ${minutesRemaining} min remaining / GPS accuracy Â±${accuracy} m`);
 }
 
 function startNavigation() {
@@ -218,7 +218,7 @@ previewRouteButton.addEventListener('click', () => {
 });
 
 function locationErrorMessage(error) {
-  if (error?.code === 1) return 'Location permission was denied. In macOS, enable Location Services for your browser in System Settings → Privacy & Security → Location Services, then reload this page.';
+  if (error?.code === 1) return 'Location permission was denied. In macOS, enable Location Services for your browser in System Settings â Privacy & Security â Location Services, then reload this page.';
   if (error?.code === 2) return 'Your Mac could not determine a location. Check Wi-Fi/location services and try again near a window.';
   if (error?.code === 3) return 'Location lookup timed out. Try again, or check that this site is running on localhost or HTTPS.';
   return 'Could not get your location. Try again.';
@@ -235,7 +235,7 @@ function requestCurrentLocation(onSuccess, onError = null) {
     fail('This browser does not provide location services.');
     return;
   }
-  setStatus('Requesting your location… If no prompt appears, check browser and macOS Location Services permissions.');
+  setStatus('Requesting your location... If no prompt appears, check browser and macOS Location Services permissions.');
   let finished = false;
   const timeout = window.setTimeout(() => {
     if (!finished) setStatus('Still waiting for location. Check the browser location icon or macOS Location Services permission.');
@@ -260,9 +260,9 @@ async function reverseGeocode(point) {
 }
 
 locationButton.addEventListener('click', () => {
-  setStatus('Location button clicked. Checking browser permission…');
+  setStatus('Location button clicked. Checking browser permission...');
   locationButton.disabled = true;
-  locationButton.textContent = 'Locating…';
+  locationButton.textContent = 'Locating...';
   requestCurrentLocation(position => {
     currentOrigin = { lat: position.coords.latitude, lon: position.coords.longitude, label: 'Current location' };
     showCurrentOrigin(position);
@@ -406,7 +406,7 @@ async function geocode(query) {
   const url = `https://geosearch.planninglabs.nyc/v2/search?size=1&text=${encodeURIComponent(query)}`;
   const places = await fetchJson(url, 'NYC address search', { headers: { Accept: 'application/json' } });
   const feature = places.features?.[0];
-  if (!feature) throw new Error(`Could not find “${query}”.`);
+  if (!feature) throw new Error(`Could not find â${query}â.`);
   const [lon, lat] = feature.geometry.coordinates;
   const point = { lat: Number(lat), lon: Number(lon), label: feature.properties?.label || query };
   geocodeCache.set(query, point);
@@ -572,7 +572,7 @@ async function getNearbyBuildingBins(routePointsForSearch) {
   if (!routePointsForSearch.length) return new Set();
   const lats = routePointsForSearch.map(point => point.lat);
   const lons = routePointsForSearch.map(point => point.lon);
-  const buffer = 0.0006; // roughly 50–70 m around the walking line's bounding box
+  const buffer = 0.0006; // roughly 50-70 m around the walking line's bounding box
   const geometry = JSON.stringify({
     xmin: Math.min(...lons) - buffer,
     ymin: Math.min(...lats) - buffer,
@@ -786,8 +786,8 @@ function showRoutes(routes, scored, preference) {
     const route = routes[index];
     const timeDelta = Math.round((route.duration - recommendation.duration) / 60);
     const coverDelta = scored.coverage[index].coveredPercent - scored.coverage[scored.selected].coveredPercent;
-    const tradeoff = recommended ? `${scored.coverage[index].coveredPercent}% likely covered` : `${timeDelta >= 0 ? '+' : ''}${timeDelta} min · ${coverDelta >= 0 ? '+' : ''}${coverDelta}% cover`;
-    return `<div class="route-card ${recommended ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${recommended ? 'true' : 'false'}" data-route-index="${index}"><div class="route-card-top"><b class="route-badge">${recommended ? 'Recommended' : 'Alternative'}</b><span class="route-metrics">${formatDistance(route)} · ${Math.round(route.duration / 60)} min</span></div><strong class="route-name">${routeStreetLabel(route, index)}</strong><span>${tradeoff}</span><small>${preference === 'min' ? `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'}` : `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'} favored`}</small></div>`;
+    const tradeoff = recommended ? `${scored.coverage[index].coveredPercent}% likely covered` : `${timeDelta >= 0 ? '+' : ''}${timeDelta} min / ${coverDelta >= 0 ? '+' : ''}${coverDelta}% cover`;
+    return `<div class="route-card ${recommended ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${recommended ? 'true' : 'false'}" data-route-index="${index}"><div class="route-card-top"><b class="route-badge">${recommended ? 'Recommended' : 'Alternative'}</b><span class="route-metrics">${formatDistance(route)} / ${Math.round(route.duration / 60)} min</span></div><strong class="route-name">${routeStreetLabel(route, index)}</strong><span>${tradeoff}</span><small>${preference === 'min' ? `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'}` : `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'} favored`}</small></div>`;
   };
   resultsEl.hidden = false;
   const alternativeCount = Math.max(0, routes.length - 1);
@@ -797,7 +797,7 @@ function showRoutes(routes, scored, preference) {
     goButton.hidden = false;
     routeLayers.forEach((layer, index) => layer.setStyle({ color: index === selected ? '#24683c' : '#9aafa0', weight: index === selected ? 7 : 4, opacity: index === selected ? .96 : .58 }));
     resultsEl.querySelectorAll('.route-card').forEach(card => { const active = Number(card.dataset.routeIndex) === selected; card.classList.toggle('selected', active); card.setAttribute('aria-pressed', active ? 'true' : 'false'); });
-    setStatus(`${routes.length} routes found · ${selected === scored.selected ? 'Recommended' : 'Alternative'} selected`);
+    setStatus(`${routes.length} routes found / ${selected === scored.selected ? 'Recommended' : 'Alternative'} selected`);
   };
   resultsEl.querySelectorAll('.route-card').forEach(card => {
     const select = () => updateSelection(Number(card.dataset.routeIndex));
@@ -821,7 +821,7 @@ routeForm.addEventListener('submit', async (event) => {
   try {
     if (window.location.protocol === 'file:') throw new Error('Please run this app through http://localhost:8000; browsers block its data services when index.html is opened directly.');
     const preference = new FormData(routeForm).get('preference');
-    setStatus('Finding both places…');
+    setStatus('Finding both places...');
     const originInput = document.querySelector('#origin');
     const destinationInput = document.querySelector('#destination');
     const originValue = originInput.value.trim();
@@ -830,10 +830,10 @@ routeForm.addEventListener('submit', async (event) => {
     const selectedDestination = selectedLocations.get(destinationInput);
     const start = currentOrigin && (originValue === 'Current location' || originValue === currentOrigin.label) ? currentOrigin : selectedOrigin?.label === originValue ? selectedOrigin : await geocode(originValue);
     const end = selectedDestination?.label === destinationValue ? selectedDestination : await geocode(destinationValue);
-    setStatus('Calculating walking alternatives…');
+    setStatus('Calculating walking alternatives...');
     let routes = await getRoutes(start, end);
     const baseRoute = routes.reduce((shortestRoute, route) => route.distance < shortestRoute.distance ? route : shortestRoute, routes[0]);
-    setStatus('Exploring nearby parallel streets…');
+    setStatus('Exploring nearby parallel streets...');
     const parallelRoutes = await getParallelCandidates(start, end, baseRoute);
     routes = [...new Map([...routes, ...parallelRoutes].map(route => [routeKey(route), route])).values()];
     const shortestDistance = Math.min(...routes.map(route => route.distance));
@@ -844,7 +844,7 @@ routeForm.addEventListener('submit', async (event) => {
     let scaffoldResult = { plotted: 0, points: [] };
     let scaffoldWarning = '';
     let scaffoldSource = 'local snapshot';
-    setStatus('Loading cached NYC scaffold permits…');
+    setStatus('Loading cached NYC scaffold permits...');
     try {
       const cached = await getCachedScaffolds();
       permits = cached.rows;
