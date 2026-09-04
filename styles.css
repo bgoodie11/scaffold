@@ -66,6 +66,7 @@ button:disabled { opacity: .55; cursor: wait; }
 .route-name { display: block; margin: 6px 0 4px; font-weight: 800; }
 .route-card span, .route-card small { color: #5d6a62; }
 .route-card small { display: block; margin-top: 5px; font-size: 11px; }
+.route-card small.route-tradeoff { color: #24683c; font-weight: 700; }
 .compare-button { width: 100%; margin: 2px 0 0; padding: 10px; background: #eef3ef; color: #24683c; font-size: 12px; }
 .results-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
 .results-heading strong { font-size: 13px; }

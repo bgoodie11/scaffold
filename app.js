@@ -827,12 +827,33 @@ function showRoutes(routes, scored, preference) {
   routeLayers = routes.map(route => L.geoJSON(route.geometry, { pane: 'routePane', className: 'route-line' }).addTo(map));
   const order = [scored.selected, ...routes.map((_, index) => index).filter(index => index !== scored.selected)];
   const recommendation = routes[scored.selected];
+  // Compare the recommendation against the route that would win under the
+  // opposite preference, so the card can say what it trades cover for time.
+  const oppositePreference = preference === 'min' ? 'max' : 'min';
+  let tradeoffIndex = -1;
+  let bestOppositeScore = Infinity;
+  routes.forEach((route, index) => {
+    if (index === scored.selected) return;
+    const score = scoreRoute(route, scored.shedPoints, oppositePreference);
+    if (score < bestOppositeScore) { bestOppositeScore = score; tradeoffIndex = index; }
+  });
+  const recommendationTradeoff = (() => {
+    if (tradeoffIndex < 0) return '';
+    const timeDelta = Math.round((recommendation.duration - routes[tradeoffIndex].duration) / 60);
+    const coverDelta = scored.coverage[scored.selected].coveredPercent - scored.coverage[tradeoffIndex].coveredPercent;
+    const coverPart = coverDelta > 0 ? `+${coverDelta}% cover` : coverDelta < 0 ? `${-coverDelta}% less cover` : '';
+    const timePart = timeDelta > 0 ? `+${timeDelta} min` : timeDelta < 0 ? `${-timeDelta} min faster` : '';
+    if (coverPart && timePart) return timeDelta > 0 ? `${coverPart} for ${timePart}` : `${coverPart}, ${timePart}`;
+    if (coverPart) return `${coverPart}, same time`;
+    if (timePart) return timeDelta > 0 ? `Same cover for ${timePart}` : `Same cover, ${timePart}`;
+    return '';
+  })();
   const cardMarkup = (index, recommended = false) => {
     const route = routes[index];
     const timeDelta = Math.round((route.duration - recommendation.duration) / 60);
     const coverDelta = scored.coverage[index].coveredPercent - scored.coverage[scored.selected].coveredPercent;
     const tradeoff = recommended ? `${scored.coverage[index].coveredPercent}% likely covered` : `${timeDelta >= 0 ? '+' : ''}${timeDelta} min / ${coverDelta >= 0 ? '+' : ''}${coverDelta}% cover`;
-    return `<div class="route-card ${recommended ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${recommended ? 'true' : 'false'}" data-route-index="${index}"><div class="route-card-top"><b class="route-badge">${recommended ? 'Recommended' : 'Alternative'}</b><span class="route-metrics">${formatDistance(route)} / ${Math.round(route.duration / 60)} min</span></div><strong class="route-name">${routeStreetLabel(route, index)}</strong><span>${tradeoff}</span><small>${preference === 'min' ? `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'}` : `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'} favored`}</small></div>`;
+    return `<div class="route-card ${recommended ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${recommended ? 'true' : 'false'}" data-route-index="${index}"><div class="route-card-top"><b class="route-badge">${recommended ? 'Recommended' : 'Alternative'}</b><span class="route-metrics">${formatDistance(route)} / ${Math.round(route.duration / 60)} min</span></div><strong class="route-name">${routeStreetLabel(route, index)}</strong><span>${tradeoff}</span>${recommended && recommendationTradeoff ? `<small class="route-tradeoff">${recommendationTradeoff}</small>` : ''}<small>${preference === 'min' ? `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'}` : `${scored.exposures[index]} nearby sidewalk shed${scored.exposures[index] === 1 ? '' : 's'} favored`}</small></div>`;
   };
   resultsEl.hidden = false;
   const alternativeCount = Math.max(0, routes.length - 1);
