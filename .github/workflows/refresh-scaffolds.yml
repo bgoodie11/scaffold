@@ -26,4 +26,7 @@ jobs:
           git add data/scaffolds.json
           git diff --cached --quiet || git commit -m "Refresh scaffold snapshot"
           git push
-
+      - name: Redeploy site
+        env:
+            GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-pages.yml
