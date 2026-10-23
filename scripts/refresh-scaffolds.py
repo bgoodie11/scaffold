@@ -6,6 +6,7 @@ Uses only Python's standard library so it can run in GitHub Actions or locally.
 import csv
 import io
 import json
+import math
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,10 +24,21 @@ def main():
     source_rows = fetch_active_sheds()
     filtered = []
     seen = set()
+    excluded = 0
     for row in source_rows:
         if str(row.get("Borough Digit", "")).strip() != "1":
             continue
-        if not row.get("Latitude Point") or not row.get("Longitude Point"):
+        raw_lat, raw_lon = row.get("Latitude Point"), row.get("Longitude Point")
+        try:
+            lat, lon = float(raw_lat), float(raw_lon)
+            valid_coordinates = (math.isfinite(lat) and math.isfinite(lon)
+                                 and 40.45 < lat < 40.95 and -74.3 < lon < -73.6)
+        except (TypeError, ValueError):
+            valid_coordinates = False
+        if not valid_coordinates:
+            excluded += 1
+            print(f"Excluded job {row.get('Job Number')!r}: invalid coordinates "
+                  f"latitude={raw_lat!r}, longitude={raw_lon!r}")
             continue
         key = row.get("Job Number") or (row.get("BIN Number"), row.get("House Number"), row.get("Street Name"))
         if key in seen:
@@ -50,6 +62,8 @@ def main():
             "source": "NYC DOB Active Sidewalk Shed map"
         })
 
+    print(f"Excluded {excluded} Manhattan records with invalid coordinates")
+
     payload = {
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "source": "NYC DOB Active Sidewalk Shed map CSV",
@@ -61,4 +75,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
